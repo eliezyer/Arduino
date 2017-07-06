@@ -3,6 +3,9 @@ const int SwitchL = 10; //left arm switch
 const int SwitchM = 9; //middle arm switch
 const int SwitchR = 8; //right arm switch
 const int ledPin = 13; //led to have feedback since we dont have stepper motor yet
+int Trial = 0;
+int flagEnd = 1;
+int flagStart = 0; // it has to start at zero so
 int SLState = 0;
 int SMState = 0;
 int SRState = 0;
@@ -34,10 +37,17 @@ void loop()
   SMState = digitalRead(SwitchM);
   SLState = digitalRead(SwitchL);
   SRState = digitalRead(SwitchR);
-  if (SMState == HIGH) //this will be important to send the TTLs to the recording system, about the beggining of the trials
+  if (SMState == LOW && flagEnd == 1) //this will be important to send the TTLs to the recording system, about the beggining of the trials
   {
+      Trial++;
+      Serial.println(Trial);
+      delay(1000);
+      flagEnd = 0;
+      flagStart = 1;
   }
 
+if (flagStart == 1)
+{
   if (SLState == LOW && correctArm == 0)
   {
       //opens the left door and delivery the water at the left
@@ -45,7 +55,10 @@ void loop()
       digitalWrite(ledPin,HIGH);
       delay(1000);
       digitalWrite(ledPin,LOW);
+      
       previousArm = correctArm;
+      flagEnd = 1;
+      flagStart = 0;
   }
   else
   {
@@ -59,8 +72,12 @@ void loop()
       digitalWrite(ledPin,HIGH);
       delay(1000);
       digitalWrite(ledPin,LOW);
+      
       previousArm = correctArm;
+      flagEnd = 1;
+      flagStart = 0;
   }
+}
 
 
   //just to check at the serial monitor
