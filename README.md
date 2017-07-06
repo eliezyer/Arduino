@@ -1,2 +1,2 @@
-# Arduino
-Codes developed for general use in arduino, mostly in automation of mazes and neuroscience behavior stuff.
+# BehavioralAutomation
+Codes developed for automation of maze, skinner boxes and etc. Based on arduino, raspberry pi and so on.
