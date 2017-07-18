@@ -2,13 +2,15 @@
 #include <Wire.h>
 #include <Adafruit_RGBLCDShield.h>
 #include <utility/Adafruit_MCP23017.h>
+#include <Stepper.h>
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 //Declaring variables for the algorithm
-const int SwitchL = 10; //left arm switch
+const int SwitchL = 8; //left arm switch
 const int SwitchM = 9; //middle arm switch
-const int SwitchR = 8; //right arm switch
-const int ledPin = 13; //led to have feedback since we dont have stepper motor yet
+const int SwitchR = 10; //right arm switch
+const int stepsPerRevolution = 50; //stepper motor revolution, 360 deg would be 200 steps
+
 int Trial = 0; //Number of trials
 float percentage = 0; //Percentage of correct trials
 int flagEnd = 1;
@@ -16,6 +18,7 @@ int flagStart = 0; // it has to start at zero so
 int flagMainMenu = 1; //show main menu at the LCD screen
 int flagDelayMenu = 0; //show Delay menu and current Delay variable value
 int flagTask = 0; //start or pause the task, the variables will continue if paused, to pause press left button
+int flagMiddleMotor = 1; // flag the first trial middle motor opening 
 int MenuPos = 0; // Menu arrow position
 int SLState = 0; //Switch at left arm state
 int SMState = 0; //Switch at middle arm state
@@ -29,13 +32,22 @@ int Delay = 0; //Delay for the home cage
 //For the LCD screen backlight
 #define OFF 0x0
 
+//initialize stepper for each arm
+Stepper MotorL(stepsPerRevolution,22,23,24,25); //Left arm stepper motor
+Stepper MotorM(stepsPerRevolution,26,27,28,29); //Middle arm stepper motor
+Stepper MotorR(stepsPerRevolution,30,31,32,33); //Right arm stepper motor
+
 void setup()
 {
+  //setting the motor speed at 60 rpm
+  MotorL.setSpeed(30);
+  MotorM.setSpeed(30);
+  MotorR.setSpeed(30);
+  
   //setting up input or output pins
   pinMode(SwitchL, INPUT);
   pinMode(SwitchM, INPUT);
   pinMode(SwitchR, INPUT);
-  pinMode(ledPin, OUTPUT);
   Serial.begin(9600);
   
   lcd.begin(16,2); // starting LCD
@@ -152,7 +164,11 @@ void Task(int Delay){
       else if (previousArm == 1){
         correctArm = 0; //left arm
       }
-    
+
+      if(Trial == 0 && flagMiddleMotor == 1){
+        MotorM.step(-stepsPerRevolution);
+        flagMiddleMotor = 0;
+      }
       SMState = digitalRead(SwitchM);
       SLState = digitalRead(SwitchL);
       SRState = digitalRead(SwitchR);
@@ -160,6 +176,8 @@ void Task(int Delay){
           Trial++;
           flagEnd = 0;
           flagStart = 1;
+          delay(1000);
+          MotorM.step(stepsPerRevolution);
       }
     
       if (flagStart == 1){
@@ -168,23 +186,31 @@ void Task(int Delay){
               /*
               INSERT CODE TO OPEN THE LEFT DOOR AND DELIVERY REWARD
               */
-          
+           MotorL.step(stepsPerRevolution);
            previousArm = correctArm;
            flagEnd = 1;
            flagStart = 0;
            correctTrials++;
            percentage = correctTrials*100/Trial;
+           delay(1000);
+           MotorL.step(-stepsPerRevolution);
+           delay(500);
+           MotorM.step(-stepsPerRevolution);
          }
          else if (SLState == LOW && correctArm == 1){
           //opens the left door and do not reward
                /*
-              INSERT CODE TO OPEN THE RIGHT DOOR ONLY
+              INSERT CODE TO OPEN THE LEFT DOOR ONLY
               */
-            delay(200);
+            MotorL.step(stepsPerRevolution);
             flagEnd = 1;
             flagStart = 0;
             wrongTrials++;
             percentage = correctTrials*100/Trial;
+            delay(1000);
+            MotorL.step(-stepsPerRevolution);
+            delay(500);
+            MotorM.step(-stepsPerRevolution);
           }
       
           if (SRState == LOW && correctArm == 1){
@@ -192,22 +218,31 @@ void Task(int Delay){
               /*
               INSERT CODE TO OPEN THE RIGHT DOOR AND DELIVERY REWARD
               */
+              MotorR.step(-stepsPerRevolution);
               previousArm = correctArm;
               flagEnd = 1;
               flagStart = 0;
               correctTrials++;
               percentage = correctTrials*100/Trial;
+              delay(1000);
+              MotorR.step(stepsPerRevolution);
+              delay(500);
+              MotorM.step(-stepsPerRevolution);
           }
           else if (SRState == LOW && correctArm == 0){
               //open the left and do not reward
               /*
-              INSERT CODE TO OPEN THE LEFT DOOR ONLY
+              INSERT CODE TO OPEN THE RIGHT DOOR ONLY
               */
-              delay(200);
+              MotorR.step(-stepsPerRevolution);
               flagEnd = 1;
               flagStart = 0;
               wrongTrials++;
               percentage = correctTrials*100/Trial;
+              delay(1000);
+              MotorR.step(stepsPerRevolution);
+              delay(500);
+              MotorM.step(-stepsPerRevolution);
           }
     }
     //Prints task info at the LCD screen
