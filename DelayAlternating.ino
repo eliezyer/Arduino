@@ -39,10 +39,6 @@ Stepper MotorR(stepsPerRevolution,30,31,32,33); //Right arm stepper motor
 
 void setup()
 {
-  //setting the motor speed at 60 rpm
-  MotorL.setSpeed(30);
-  MotorM.setSpeed(30);
-  MotorR.setSpeed(30);
   
   //setting up input or output pins
   pinMode(SwitchL, INPUT);
@@ -155,7 +151,67 @@ void DelayMenu(uint8_t ChangeDelay) //Function for the Delay Menu
     }
 }
 
-void Task(int Delay){
+void MotorControl(int motor, int opcl){ //Function to control motors opening and close
+  int intermStep = 5;
+  int intermSpeed = 10;
+  int fullSpeed = 60;
+  if (motor == 0){ // left motor
+    if (opcl == 1){ // open door
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(intermStep);
+        MotorM.setSpeed(fullSpeed);
+        MotorM.step((stepsPerRevolution-(2*intermStep)));
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(intermStep);
+    }
+    else if(opcl == 0){ // close door
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(-intermStep);
+        MotorM.setSpeed(fullSpeed);
+        MotorM.step(-(stepsPerRevolution-(2*intermStep)));
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(-intermStep);
+    }
+  }
+  else if (motor == 1){ //middle motor
+    if (opcl == 1){ // open door
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(-intermStep);
+        MotorL.setSpeed(fullSpeed);
+        MotorL.step(-(stepsPerRevolution-(2*intermStep)));
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(-intermStep);
+    }
+    else if(opcl == 0){ // close door
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(intermStep);
+        MotorL.setSpeed(fullSpeed);
+        MotorL.step((stepsPerRevolution-(2*intermStep)));
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(intermStep);
+    }
+  }
+  else if(motor == 2){ //right motor
+    if (opcl == 1){ // open door
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(intermStep);
+        MotorR.setSpeed(fullSpeed);
+        MotorR.step((stepsPerRevolution-(2*intermStep)));
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(intermStep);
+    }
+    else if(opcl == 0){ // close door
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(-intermStep);
+        MotorR.setSpeed(fullSpeed);
+        MotorR.step(-(stepsPerRevolution-(2*intermStep)));
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(-intermStep);
+    }
+  }
+}
+
+void Task(int Delay){ //task structure function
       //lcd.clear();
       //change it to choose randomly an initial arm
       if (previousArm == 0){
@@ -165,8 +221,8 @@ void Task(int Delay){
         correctArm = 0; //left arm
       }
 
-      if(Trial == 0 && flagMiddleMotor == 1){
-        MotorM.step(-stepsPerRevolution);
+      if(Trial == 0 && flagMiddleMotor == 1){ //opening the middle dor at the first trial
+        MotorControl(1,1);
         flagMiddleMotor = 0;
       }
       SMState = digitalRead(SwitchM);
@@ -177,7 +233,7 @@ void Task(int Delay){
           flagEnd = 0;
           flagStart = 1;
           delay(1000);
-          MotorM.step(stepsPerRevolution);
+        MotorControl(1,0);
       }
     
       if (flagStart == 1){
@@ -186,31 +242,32 @@ void Task(int Delay){
               /*
               INSERT CODE TO OPEN THE LEFT DOOR AND DELIVERY REWARD
               */
-           MotorL.step(stepsPerRevolution);
+
            previousArm = correctArm;
            flagEnd = 1;
            flagStart = 0;
            correctTrials++;
            percentage = correctTrials*100/Trial;
+           MotorControl(0,1);
            delay(1000);
-           MotorL.step(-stepsPerRevolution);
+           MotorControl(0,0);
            delay(500);
-           MotorM.step(-stepsPerRevolution);
+           MotorControl(1,1);
          }
          else if (SLState == LOW && correctArm == 1){
           //opens the left door and do not reward
                /*
               INSERT CODE TO OPEN THE LEFT DOOR ONLY
               */
-            MotorL.step(stepsPerRevolution);
             flagEnd = 1;
             flagStart = 0;
             wrongTrials++;
             percentage = correctTrials*100/Trial;
+            MotorControl(0,1);
             delay(1000);
-            MotorL.step(-stepsPerRevolution);
+            MotorControl(0,0);
             delay(500);
-            MotorM.step(-stepsPerRevolution);
+            MotorControl(1,1);
           }
       
           if (SRState == LOW && correctArm == 1){
@@ -218,31 +275,32 @@ void Task(int Delay){
               /*
               INSERT CODE TO OPEN THE RIGHT DOOR AND DELIVERY REWARD
               */
-              MotorR.step(-stepsPerRevolution);
+              
               previousArm = correctArm;
               flagEnd = 1;
               flagStart = 0;
               correctTrials++;
               percentage = correctTrials*100/Trial;
+              MotorControl(2,1);
               delay(1000);
-              MotorR.step(stepsPerRevolution);
+              MotorControl(2,0);
               delay(500);
-              MotorM.step(-stepsPerRevolution);
+              MotorControl(1,1);
           }
           else if (SRState == LOW && correctArm == 0){
               //open the left and do not reward
               /*
               INSERT CODE TO OPEN THE RIGHT DOOR ONLY
               */
-              MotorR.step(-stepsPerRevolution);
               flagEnd = 1;
               flagStart = 0;
               wrongTrials++;
               percentage = correctTrials*100/Trial;
+              MotorControl(2,1);
               delay(1000);
-              MotorR.step(stepsPerRevolution);
+              MotorControl(2,0);
               delay(500);
-              MotorM.step(-stepsPerRevolution);
+              MotorControl(1,1);
           }
     }
     //Prints task info at the LCD screen
