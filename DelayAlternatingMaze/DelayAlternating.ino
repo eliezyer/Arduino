@@ -6,12 +6,17 @@
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 //Declaring variables for the algorithm
-const int SwitchL = 8; //left arm switch
-const int SwitchM = 9; //middle arm switch
-const int SwitchR = 10; //right arm switch
+const int SwitchHC = 6; // home cage sensor
+const int SwitchL = 7; //left arm switch
+const int SwitchM = 8; //middle arm switch
+const int SwitchR = 9; //right arm switch
 const int stepsPerRevolution = 50; //stepper motor revolution, 360 deg would be 200 steps
-
+const int WaterL = 2;
+const int WaterR = 3;
+const float SolenoidTime = 1000; //time of open solenoid (in ms)
 int Trial = 0; //Number of trials
+int Motor; // which motor will open
+int State; //next state of the motor, close or open
 float percentage = 0; //Percentage of correct trials
 int flagEnd = 1;
 int flagStart = 0; // it has to start at zero so
@@ -19,7 +24,9 @@ int flagMainMenu = 1; //show main menu at the LCD screen
 int flagDelayMenu = 0; //show Delay menu and current Delay variable value
 int flagTask = 0; //start or pause the task, the variables will continue if paused, to pause press left button
 int flagMiddleMotor = 1; // flag the first trial middle motor opening 
+int flagHC = 0; //flag if the animal is inside HC
 int MenuPos = 0; // Menu arrow position
+int SHCState = 0; //Switch at the home cage stage
 int SLState = 0; //Switch at left arm state
 int SMState = 0; //Switch at middle arm state
 int SRState = 0; //Switch at right arm state
@@ -44,6 +51,11 @@ void setup()
   pinMode(SwitchL, INPUT);
   pinMode(SwitchM, INPUT);
   pinMode(SwitchR, INPUT);
+  pinMode(SwitchHC, INPUT);
+  pinMode(WaterL, OUTPUT);
+  pinMode(WaterR, OUTPUT);
+  digitalWrite(WaterL, LOW);
+  digitalWrite(WaterR, LOW);
   Serial.begin(9600);
   
   lcd.begin(16,2); // starting LCD
@@ -75,7 +87,7 @@ void loop()
       MenuPos = 1;
       lcd.clear();
       buttons = 0; //I have to clear the buttons variable because it activates another if right after this one.
-      delay(250); //I'm inserting some delay after some statements due to bounce effect from mechanical keys
+      delay(300); //I'm inserting some delay after some statements due to bounce effect from mechanical keys
     }
   }
   
@@ -153,36 +165,10 @@ void DelayMenu(uint8_t ChangeDelay) //Function for the Delay Menu
 
 void MotorControl(int motor, int opcl){ //Function to control motors opening and close
   int intermStep = 5;
-  int intermSpeed = 10;
-  int fullSpeed = 60;
+  int intermSpeed = 15;
+  int fullSpeed = 30;
   if (motor == 0){ // left motor
     if (opcl == 1){ // open door
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(intermStep);
-        MotorM.setSpeed(fullSpeed);
-        MotorM.step((stepsPerRevolution-(2*intermStep)));
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(intermStep);
-    }
-    else if(opcl == 0){ // close door
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(-intermStep);
-        MotorM.setSpeed(fullSpeed);
-        MotorM.step(-(stepsPerRevolution-(2*intermStep)));
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(-intermStep);
-    }
-  }
-  else if (motor == 1){ //middle motor
-    if (opcl == 1){ // open door
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(-intermStep);
-        MotorL.setSpeed(fullSpeed);
-        MotorL.step(-(stepsPerRevolution-(2*intermStep)));
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(-intermStep);
-    }
-    else if(opcl == 0){ // close door
         MotorL.setSpeed(intermSpeed);
         MotorL.step(intermStep);
         MotorL.setSpeed(fullSpeed);
@@ -190,23 +176,49 @@ void MotorControl(int motor, int opcl){ //Function to control motors opening and
         MotorL.setSpeed(intermSpeed);
         MotorL.step(intermStep);
     }
+    else if(opcl == 0){ // close door
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(-intermStep);
+        MotorL.setSpeed(fullSpeed);
+        MotorL.step(-(stepsPerRevolution-(2*intermStep)));
+        MotorL.setSpeed(intermSpeed);
+        MotorL.step(-intermStep);
+    }
+  }
+  else if (motor == 1){ //middle motor
+    if (opcl == 1){ // open door
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(-intermStep);
+        MotorM.setSpeed(fullSpeed);
+        MotorM.step(-(stepsPerRevolution-(2*intermStep)));
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(-intermStep);
+    }
+    else if(opcl == 0){ // close door
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(intermStep);
+        MotorM.setSpeed(fullSpeed);
+        MotorM.step((stepsPerRevolution-(2*intermStep)));
+        MotorM.setSpeed(intermSpeed);
+        MotorM.step(intermStep);
+    }
   }
   else if(motor == 2){ //right motor
     if (opcl == 1){ // open door
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(intermStep);
-        MotorR.setSpeed(fullSpeed);
-        MotorR.step((stepsPerRevolution-(2*intermStep)));
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(intermStep);
-    }
-    else if(opcl == 0){ // close door
         MotorR.setSpeed(intermSpeed);
         MotorR.step(-intermStep);
         MotorR.setSpeed(fullSpeed);
         MotorR.step(-(stepsPerRevolution-(2*intermStep)));
         MotorR.setSpeed(intermSpeed);
         MotorR.step(-intermStep);
+    }
+    else if(opcl == 0){ // close door
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(intermStep);
+        MotorR.setSpeed(fullSpeed);
+        MotorR.step((stepsPerRevolution-(2*intermStep)));
+        MotorR.setSpeed(intermSpeed);
+        MotorR.step(intermStep);
     }
   }
 }
@@ -228,14 +240,15 @@ void Task(int Delay){ //task structure function
       SMState = digitalRead(SwitchM);
       SLState = digitalRead(SwitchL);
       SRState = digitalRead(SwitchR);
-      if (SMState == LOW && flagEnd == 1){ //this will be important to send the TTLs to the recording system, about the beggining of the trials
+      SHCState = digitalRead(SwitchHC);
+      if (SMState == LOW && flagEnd == 1 && flagHC == 0){ //this will be important to send the TTLs to the recording system, about the beggining of the trials
           Trial++;
           flagEnd = 0;
           flagStart = 1;
           delay(1000);
-        MotorControl(1,0);
+          MotorControl(1,0);
       }
-    
+          
       if (flagStart == 1){
          if (SLState == LOW && correctArm == 0){
            //opens the left door and reward
@@ -246,13 +259,15 @@ void Task(int Delay){ //task structure function
            previousArm = correctArm;
            flagEnd = 1;
            flagStart = 0;
+           flagHC = 1;
            correctTrials++;
            percentage = correctTrials*100/Trial;
-           MotorControl(0,1);
-           delay(1000);
-           MotorControl(0,0);
-           delay(500);
-           MotorControl(1,1);
+           Motor = 0;
+           State = 1;
+           MotorControl(Motor,State);
+           digitalWrite(WaterL,HIGH);
+           delay(SolenoidTime);
+           digitalWrite(WaterL,LOW);
          }
          else if (SLState == LOW && correctArm == 1){
           //opens the left door and do not reward
@@ -261,13 +276,12 @@ void Task(int Delay){ //task structure function
               */
             flagEnd = 1;
             flagStart = 0;
+            flagHC = 1;
+            Motor = 0;
+            State = 1;
             wrongTrials++;
             percentage = correctTrials*100/Trial;
-            MotorControl(0,1);
-            delay(1000);
-            MotorControl(0,0);
-            delay(500);
-            MotorControl(1,1);
+            MotorControl(Motor,State);
           }
       
           if (SRState == LOW && correctArm == 1){
@@ -279,13 +293,15 @@ void Task(int Delay){ //task structure function
               previousArm = correctArm;
               flagEnd = 1;
               flagStart = 0;
+              flagHC = 1;
+              Motor = 2;
+              State = 1;
               correctTrials++;
               percentage = correctTrials*100/Trial;
-              MotorControl(2,1);
-              delay(1000);
-              MotorControl(2,0);
-              delay(500);
-              MotorControl(1,1);
+              MotorControl(Motor,State);
+              digitalWrite(WaterR,HIGH);
+              delay(SolenoidTime);
+              digitalWrite(WaterR,LOW);
           }
           else if (SRState == LOW && correctArm == 0){
               //open the left and do not reward
@@ -294,15 +310,23 @@ void Task(int Delay){ //task structure function
               */
               flagEnd = 1;
               flagStart = 0;
+              flagHC = 1;
+              Motor = 2;
+              State = 1;
               wrongTrials++;
               percentage = correctTrials*100/Trial;
-              MotorControl(2,1);
-              delay(1000);
-              MotorControl(2,0);
-              delay(500);
-              MotorControl(1,1);
+              MotorControl(Motor,State);
           }
     }
+    if (flagHC == 1){
+      if(SHCState == LOW){
+        flagHC = 0;
+        MotorControl(Motor,(State-1)*-1);
+        delay(Delay*1000);
+        MotorControl(1,1);
+      }
+    }
+      
     //Prints task info at the LCD screen
     lcd.setCursor(0,0);
     lcd.print("Trial: ");
