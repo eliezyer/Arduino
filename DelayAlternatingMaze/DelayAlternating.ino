@@ -2,18 +2,30 @@
 #include <Wire.h>
 #include <Adafruit_RGBLCDShield.h>
 #include <utility/Adafruit_MCP23017.h>
-#include <Stepper.h>
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
 
 //Declaring variables for the algorithm
-const int SwitchHC = 6; // home cage sensor
+unsigned long time;
+unsigned long HCtime;
+const int TTL1 = 32;
+const int TTL2 = 34;
+const int TTL3 = 36;
+const int TTL4 = 38;
+const int lD = 22; //signal to actuate in left door
+const int mD = 23; //signal to actuate in middle door
+const int rD = 24; //signal to actuate in right door
+const int oD = 25; //signal to open the door
+const int cD = 26; //signal to close the door
+const int done = 27; //read if the motor task was done
+const int SwitchHC1 = 5; // home cage sensor
+const int SwitchHC2 = 6; // home cage sensor
 const int SwitchL = 7; //left arm switch
 const int SwitchM = 8; //middle arm switch
 const int SwitchR = 9; //right arm switch
-const int stepsPerRevolution = 50; //stepper motor revolution, 360 deg would be 200 steps
 const int WaterL = 2;
 const int WaterR = 3;
 const float SolenoidTime = 1000; //time of open solenoid (in ms)
+int Done = 0; //if the door task was done or not state
 int Trial = 0; //Number of trials
 int Motor; // which motor will open
 int State; //next state of the motor, close or open
@@ -26,7 +38,8 @@ int flagTask = 0; //start or pause the task, the variables will continue if paus
 int flagMiddleMotor = 1; // flag the first trial middle motor opening 
 int flagHC = 0; //flag if the animal is inside HC
 int MenuPos = 0; // Menu arrow position
-int SHCState = 0; //Switch at the home cage stage
+int SHC1State = 0; //Switch at the home cage stage
+int SHC2State = 0; //Switch at the home cage stage
 int SLState = 0; //Switch at left arm state
 int SMState = 0; //Switch at middle arm state
 int SRState = 0; //Switch at right arm state
@@ -34,32 +47,39 @@ int previousArm = 0; //0 is left and 1 is right arm, variable to save the previo
 int correctArm; //0 is left and 1 is right arm, variable to save the correct Arm animal has to go.
 int correctTrials = 0;
 int wrongTrials = 0;
-int Delay = 0; //Delay for the home cage
-
+float Delay = 0; //Delay for the home cage
+int flagDelay = 0; //flag for the delay
 //For the LCD screen backlight
 #define OFF 0x0
-
-//initialize stepper for each arm
-Stepper MotorL(stepsPerRevolution,22,23,24,25); //Left arm stepper motor
-Stepper MotorM(stepsPerRevolution,26,27,28,29); //Middle arm stepper motor
-Stepper MotorR(stepsPerRevolution,30,31,32,33); //Right arm stepper motor
+#define WHITE 0x7
+#define VIOLET 0x5
 
 void setup()
 {
   
   //setting up input or output pins
+  pinMode(TTL1,OUTPUT);
+  pinMode(TTL2,OUTPUT);
+  pinMode(TTL3,OUTPUT);
+  pinMode(TTL4,OUTPUT);
+  pinMode(lD,OUTPUT);
+  pinMode(mD,OUTPUT);
+  pinMode(rD,OUTPUT);
+  pinMode(oD,OUTPUT);
+  pinMode(cD,OUTPUT);
+  pinMode(done,INPUT);
   pinMode(SwitchL, INPUT);
   pinMode(SwitchM, INPUT);
   pinMode(SwitchR, INPUT);
-  pinMode(SwitchHC, INPUT);
+  pinMode(SwitchHC1, INPUT);
+  pinMode(SwitchHC2, INPUT);
   pinMode(WaterL, OUTPUT);
   pinMode(WaterR, OUTPUT);
   digitalWrite(WaterL, LOW);
   digitalWrite(WaterR, LOW);
-  Serial.begin(9600);
   
   lcd.begin(16,2); // starting LCD
-  lcd.setBacklight(OFF);
+  lcd.setBacklight(VIOLET);
   lcd.setCursor(0,0);
   lcd.print("Automatic Maze");
   lcd.setCursor(5,1);
@@ -87,7 +107,7 @@ void loop()
       MenuPos = 1;
       lcd.clear();
       buttons = 0; //I have to clear the buttons variable because it activates another if right after this one.
-      delay(300); //I'm inserting some delay after some statements due to bounce effect from mechanical keys
+      delay(400); //I'm inserting some delay after some statements due to bounce effect from mechanical keys
     }
   }
   
@@ -122,10 +142,15 @@ void loop()
     MenuPos = 0;
     lcd.clear();
   }
+  Done = digitalRead(done);
+  if (Done){
+    digitalWrite(lD,LOW);
+    digitalWrite(mD,LOW);
+    digitalWrite(rD,LOW);
+    digitalWrite(oD,LOW);
+    digitalWrite(cD,LOW);
+  }
 }  
-
-
-
 
 //functions to keep code clean
 
@@ -164,66 +189,37 @@ void DelayMenu(uint8_t ChangeDelay) //Function for the Delay Menu
 }
 
 void MotorControl(int motor, int opcl){ //Function to control motors opening and close
-  int intermStep = 5;
-  int intermSpeed = 15;
-  int fullSpeed = 30;
   if (motor == 0){ // left motor
+    digitalWrite(lD,HIGH);
+  
     if (opcl == 1){ // open door
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(intermStep);
-        MotorL.setSpeed(fullSpeed);
-        MotorL.step((stepsPerRevolution-(2*intermStep)));
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(intermStep);
+      digitalWrite(oD,HIGH);
     }
     else if(opcl == 0){ // close door
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(-intermStep);
-        MotorL.setSpeed(fullSpeed);
-        MotorL.step(-(stepsPerRevolution-(2*intermStep)));
-        MotorL.setSpeed(intermSpeed);
-        MotorL.step(-intermStep);
+      digitalWrite(cD,HIGH);
     }
   }
   else if (motor == 1){ //middle motor
+    digitalWrite(mD,HIGH);
     if (opcl == 1){ // open door
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(-intermStep);
-        MotorM.setSpeed(fullSpeed);
-        MotorM.step(-(stepsPerRevolution-(2*intermStep)));
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(-intermStep);
+      digitalWrite(oD,HIGH);
     }
     else if(opcl == 0){ // close door
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(intermStep);
-        MotorM.setSpeed(fullSpeed);
-        MotorM.step((stepsPerRevolution-(2*intermStep)));
-        MotorM.setSpeed(intermSpeed);
-        MotorM.step(intermStep);
+      digitalWrite(cD,HIGH);
     }
   }
   else if(motor == 2){ //right motor
+    digitalWrite(rD,HIGH);
     if (opcl == 1){ // open door
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(-intermStep);
-        MotorR.setSpeed(fullSpeed);
-        MotorR.step(-(stepsPerRevolution-(2*intermStep)));
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(-intermStep);
+      digitalWrite(oD,HIGH);
     }
     else if(opcl == 0){ // close door
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(intermStep);
-        MotorR.setSpeed(fullSpeed);
-        MotorR.step((stepsPerRevolution-(2*intermStep)));
-        MotorR.setSpeed(intermSpeed);
-        MotorR.step(intermStep);
+      digitalWrite(cD,HIGH);
     }
   }
 }
 
-void Task(int Delay){ //task structure function
+void Task(float Delay){ //task structure function
       //lcd.clear();
       //change it to choose randomly an initial arm
       if (previousArm == 0){
@@ -233,20 +229,23 @@ void Task(int Delay){ //task structure function
         correctArm = 0; //left arm
       }
 
-      if(Trial == 0 && flagMiddleMotor == 1){ //opening the middle dor at the first trial
+      if(Trial == 0 && flagMiddleMotor == 1){ //opening the middle doOr at the first trial
         MotorControl(1,1);
         flagMiddleMotor = 0;
       }
       SMState = digitalRead(SwitchM);
       SLState = digitalRead(SwitchL);
       SRState = digitalRead(SwitchR);
-      SHCState = digitalRead(SwitchHC);
+      SHC1State = digitalRead(SwitchHC1);
+      SHC2State = digitalRead(SwitchHC2);
       if (SMState == LOW && flagEnd == 1 && flagHC == 0){ //this will be important to send the TTLs to the recording system, about the beggining of the trials
           Trial++;
           flagEnd = 0;
           flagStart = 1;
-          delay(1000);
           MotorControl(1,0);
+          digitalWrite(TTL2,HIGH);
+          delay(1000);// WE SHOULD PUT 2 SENSORS TO READ ANIMAL POSITION ALONG THE MAIN ARM
+          digitalWrite(TTL2,LOW);
       }
           
       if (flagStart == 1){
@@ -266,7 +265,11 @@ void Task(int Delay){ //task structure function
            State = 1;
            MotorControl(Motor,State);
            digitalWrite(WaterL,HIGH);
+           digitalWrite(TTL1,HIGH);
+           digitalWrite(TTL4,HIGH);  
            delay(SolenoidTime);
+           digitalWrite(TTL1,LOW);
+           digitalWrite(TTL4,LOW);             
            digitalWrite(WaterL,LOW);
          }
          else if (SLState == LOW && correctArm == 1){
@@ -282,6 +285,9 @@ void Task(int Delay){ //task structure function
             wrongTrials++;
             percentage = correctTrials*100/Trial;
             MotorControl(Motor,State);
+            digitalWrite(TTL1,HIGH);
+            delay(1000);
+            digitalWrite(TTL1,LOW);
           }
       
           if (SRState == LOW && correctArm == 1){
@@ -299,9 +305,13 @@ void Task(int Delay){ //task structure function
               correctTrials++;
               percentage = correctTrials*100/Trial;
               MotorControl(Motor,State);
+              digitalWrite(TTL3,HIGH);
+              digitalWrite(TTL4,HIGH);  
               digitalWrite(WaterR,HIGH);
               delay(SolenoidTime);
               digitalWrite(WaterR,LOW);
+              digitalWrite(TTL3,LOW);
+              digitalWrite(TTL4,LOW);  
           }
           else if (SRState == LOW && correctArm == 0){
               //open the left and do not reward
@@ -316,15 +326,22 @@ void Task(int Delay){ //task structure function
               wrongTrials++;
               percentage = correctTrials*100/Trial;
               MotorControl(Motor,State);
+              digitalWrite(TTL3,HIGH);
+              delay(1000);
+              digitalWrite(TTL3,LOW);
           }
     }
-    if (flagHC == 1){
-      if(SHCState == LOW){
-        flagHC = 0;
+    if (flagHC == 1 && !flagDelay){
+      if(SHC1State == LOW || SHC2State == LOW){
         MotorControl(Motor,(State-1)*-1);
-        delay(Delay*1000);
-        MotorControl(1,1);
+        HCtime = millis();
+        delay(1500); //time delay of door closing or opening
+        flagDelay = 1;
       }
+    }
+    
+    if (flagDelay){
+      DelayFunction(HCtime);
     }
       
     //Prints task info at the LCD screen
@@ -335,4 +352,13 @@ void Task(int Delay){ //task structure function
     lcd.print("% Correct: ");
     lcd.print(percentage);
     lcd.print("     ");
+}
+
+void DelayFunction(unsigned long HCtime){
+  time = millis();
+  if ((time - HCtime) >= Delay*1000){
+  flagHC = 0;
+  MotorControl(1,1);
+  flagDelay = 0; 
+  }
 }
