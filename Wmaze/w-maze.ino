@@ -6,6 +6,13 @@
  * this should work.
  */
 
+// include the library code:
+#include <Wire.h>
+#include <Adafruit_RGBLCDShield.h>
+#include <utility/Adafruit_MCP23017.h>
+Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
+#define OFF 0x0
+
 //declaring variables
 const int switchL = 5; //left arm sensor
 const int switchM = 6; //middle arm sensor
@@ -14,18 +21,23 @@ const int leftTTL = 8; // to signal to intan the left arm was acessed
 const int midTTL = 9; // to signal to intan the middle arm was acessed
 const int rightTTL = 10; // to signal to intan the right arm was acessed
 const int reward = 11; //correct trials will send 1 s pulses output
-int previous = 0; //variable to store previous arm visited, can assume values 0 (left), 1 (middle) and  2 (right)
-int previousOB = 0; //variable to store previous outbound arm
+int previous = 1; //variable to store previous arm visited, can assume values 0 (left), 1 (middle) and  2 (right)
+int previousOB = 2; //variable to store previous outbound arm
 int SLstate;
 int SMstate;
 int SRstate;
+int R = 0; //Reward to show at the lcd screen
+int N = 0; //Next arm 0 -> left | 1 -> middle | 2-> right
 
 //parameters to show in the lcd screen
 int oBtrials = 0; // # of outbound trials 
 int iBtrials = 0; // # of inbound trials
 int oBerror = 0; // # of outbound errors
 int iBerror = 0; // # of inbound errors
-int overAll = 0; // variable to calculate overall performance
+float overAll = 0; // variable to calculate overall performance
+
+//For the LCD screen backlight
+
 
 void setup() {
   pinMode(switchL, INPUT);
@@ -35,11 +47,52 @@ void setup() {
   pinMode(midTTL, OUTPUT);
   pinMode(rightTTL, OUTPUT);
   pinMode(reward, OUTPUT);
-  Serial.begin(9600);
+
+  lcd.begin(16,2); // starting LCD
+  lcd.setBacklight(OFF);
+  lcd.setCursor(0,0);
+  lcd.print("Automatic W-Maze");
+  lcd.setCursor(5,1);
+  lcd.print("v 0.1");
+  delay(1000);
+  lcd.clear();
 }
 
 void loop() {
- task();
+  lcd.setCursor(0,0);
+  lcd.print("N:");
+  if (N == 0) {
+    lcd.print("L ");
+  }
+  else if (N == 1){
+    lcd.print("M ");
+  }
+  else if (N == 2){
+    lcd.print("R ");
+  }
+  
+  lcd.print("R:");
+  if (R == 0){
+    lcd.print("N ");
+  }
+  else if(R == 1){
+    lcd.print("Y ");
+  }
+  lcd.print("TP:");
+  overAll = 100*((oBtrials-oBerror+iBtrials-iBerror)/(oBtrials+iBtrials));
+  lcd.print(overAll);
+  lcd.setCursor(0,1);
+  lcd.print("OB:");
+  float oBperc = 100*(oBtrials-oBerror)/(oBtrials);
+  lcd.print(oBperc);
+  lcd.setCursor(9,1);
+  lcd.print("IB:");
+  float iBperc = 100*(iBtrials-iBerror)/(iBtrials);
+  lcd.print(iBperc);
+  
+  
+  
+  task();
 }
 
 
@@ -51,8 +104,9 @@ void task() {
 
     //visiting the left arm
     if (SLstate == LOW && (previous == 1 && previousOB == 2)){
+      R = 1;
+      N = 1;
       oBtrials++;
-      Serial.println("Correct left trial");
       digitalWrite(leftTTL,HIGH);
       digitalWrite(reward,HIGH);
       delay(1000);
@@ -62,9 +116,10 @@ void task() {
       previous = 0;
     }
     else  if (SLstate == LOW && (previous == 1 && previousOB == 0)){
+      R = 0;
+      N = 1;
       oBtrials++;
       oBerror++;
-      Serial.println("Wrong left trial outbound error");
       digitalWrite(leftTTL,HIGH);
       delay(1000);
       digitalWrite(leftTTL,LOW);
@@ -72,9 +127,10 @@ void task() {
       previous = 0;
     }
     else if (SLstate == LOW && (previous == 2)){ //inbound error
+      R = 0;
+      N = 1;
       iBtrials++;
       iBerror++;
-      Serial.println("Wrong left trial inbound error");
       digitalWrite(leftTTL,HIGH);
       delay(1000);
       digitalWrite(leftTTL,LOW);
@@ -85,8 +141,14 @@ void task() {
     //visiting the middle arm
     if (SMstate == LOW && (previous == 0 || previous == 2))
     {
+      if (previous == 0){
+        N = 2;
+      }
+      else if (previous == 2){
+        N = 0;
+      }
+      R = 1;
       iBtrials++;
-      Serial.println("Correct mid trial");
       digitalWrite(midTTL,HIGH);
       digitalWrite(reward,HIGH);
       delay(1000);
@@ -99,8 +161,9 @@ void task() {
     //visiting the right arm
     if (SRstate == LOW && (previous == 1 && previousOB == 0)) //correct trial
     {
+      R = 1;
+      N = 1;
       oBtrials++;
-      Serial.println("Correct right trial");
       digitalWrite(rightTTL,HIGH);
       digitalWrite(reward,HIGH);
       delay(1000);
@@ -110,9 +173,10 @@ void task() {
       previous = 2;      
     }
     else if (SRstate == LOW && (previous == 1 && previousOB == 2))    { //outbound error
+      R = 0;
+      N = 1;
       oBtrials++;
       oBerror++;
-      Serial.println("Wrong right trial outbound error");
       digitalWrite(rightTTL,HIGH);
       delay(1000);
       digitalWrite(rightTTL,LOW);
@@ -120,9 +184,10 @@ void task() {
       previous = 2;
     }
     else if (SRstate == LOW && (previous == 0)){ // inbound error
+      R = 0;
+      N = 1;
       iBtrials++;
       iBerror++;
-      Serial.println("Wrong right trial inbound error");
       digitalWrite(rightTTL,HIGH);
       delay(1000);
       digitalWrite(rightTTL,LOW);
@@ -130,4 +195,5 @@ void task() {
       previous = 2;
     }
 }
+
 
