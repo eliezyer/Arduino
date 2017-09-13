@@ -21,9 +21,12 @@ int SMstate;
 int SRstate;
 
 //parameters to show in the lcd screen
-int Trials = 0; // # total trials
-int oBtrials = 0; // # outbound trials 
-int iBtrials = 0;
+int oBtrials = 0; // # of outbound trials 
+int iBtrials = 0; // # of inbound trials
+int oBerror = 0; // # of outbound errors
+int iBerror = 0; // # of inbound errors
+int overAll = 0; // variable to calculate overall performance
+
 void setup() {
   pinMode(switchL, INPUT);
   pinMode(switchM, INPUT);
@@ -36,7 +39,7 @@ void setup() {
 }
 
 void loop() {
- task()
+ task();
 }
 
 
@@ -48,6 +51,7 @@ void task() {
 
     //visiting the left arm
     if (SLstate == LOW && (previous == 1 && previousOB == 2)){
+      oBtrials++;
       Serial.println("Correct left trial");
       digitalWrite(leftTTL,HIGH);
       digitalWrite(reward,HIGH);
@@ -58,6 +62,8 @@ void task() {
       previous = 0;
     }
     else  if (SLstate == LOW && (previous == 1 && previousOB == 0)){
+      oBtrials++;
+      oBerror++;
       Serial.println("Wrong left trial outbound error");
       digitalWrite(leftTTL,HIGH);
       delay(1000);
@@ -65,7 +71,9 @@ void task() {
       previousOB = 0;
       previous = 0;
     }
-    else if (SLstate == LOW && (previous == 2)){
+    else if (SLstate == LOW && (previous == 2)){ //inbound error
+      iBtrials++;
+      iBerror++;
       Serial.println("Wrong left trial inbound error");
       digitalWrite(leftTTL,HIGH);
       delay(1000);
@@ -73,9 +81,11 @@ void task() {
       previousOB = 0;
       previous = 0;
     }
+    
     //visiting the middle arm
     if (SMstate == LOW && (previous == 0 || previous == 2))
     {
+      iBtrials++;
       Serial.println("Correct mid trial");
       digitalWrite(midTTL,HIGH);
       digitalWrite(reward,HIGH);
@@ -89,6 +99,7 @@ void task() {
     //visiting the right arm
     if (SRstate == LOW && (previous == 1 && previousOB == 0)) //correct trial
     {
+      oBtrials++;
       Serial.println("Correct right trial");
       digitalWrite(rightTTL,HIGH);
       digitalWrite(reward,HIGH);
@@ -99,6 +110,8 @@ void task() {
       previous = 2;      
     }
     else if (SRstate == LOW && (previous == 1 && previousOB == 2))    { //outbound error
+      oBtrials++;
+      oBerror++;
       Serial.println("Wrong right trial outbound error");
       digitalWrite(rightTTL,HIGH);
       delay(1000);
@@ -106,7 +119,9 @@ void task() {
       previousOB = 2;
       previous = 2;
     }
-    else if (SRstate == LOW && (previous == 0)){
+    else if (SRstate == LOW && (previous == 0)){ // inbound error
+      iBtrials++;
+      iBerror++;
       Serial.println("Wrong right trial inbound error");
       digitalWrite(rightTTL,HIGH);
       delay(1000);
@@ -114,6 +129,5 @@ void task() {
       previousOB = 2;
       previous = 2;
     }
-}
 }
 
