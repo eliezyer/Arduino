@@ -7,13 +7,18 @@
  */
 
 // include the library code:
+
 #include <Wire.h>
 #include <Adafruit_RGBLCDShield.h>
 #include <utility/Adafruit_MCP23017.h>
 Adafruit_RGBLCDShield lcd = Adafruit_RGBLCDShield();
-#define OFF 0x0
+#define OFF 0x7
+#define RED 0x1
 
 //declaring variables
+const int waterL = 26;
+const int waterM = 28;
+const int waterR = 30;
 const int switchL = 5; //left arm sensor
 const int switchM = 6; //middle arm sensor
 const int switchR = 7; //right arm sensor
@@ -28,6 +33,7 @@ int SMstate;
 int SRstate;
 int R = 0; //Reward to show at the lcd screen
 int N = 0; //Next arm 0 -> left | 1 -> middle | 2-> right
+int timeArm;
 
 //parameters to show in the lcd screen
 int oBtrials = 0; // # of outbound trials 
@@ -35,6 +41,7 @@ int iBtrials = 0; // # of inbound trials
 int oBerror = 0; // # of outbound errors
 int iBerror = 0; // # of inbound errors
 float overAll = 0; // variable to calculate overall performance
+
 
 //For the LCD screen backlight
 
@@ -47,6 +54,9 @@ void setup() {
   pinMode(midTTL, OUTPUT);
   pinMode(rightTTL, OUTPUT);
   pinMode(reward, OUTPUT);
+  pinMode(waterL, OUTPUT);
+  pinMode(waterM, OUTPUT);
+  pinMode(waterR, OUTPUT);
 
   lcd.begin(16,2); // starting LCD
   lcd.setBacklight(OFF);
@@ -59,6 +69,7 @@ void setup() {
 }
 
 void loop() {
+  int time = millis();
   lcd.setCursor(0,0);
   lcd.print("N:");
   if (N == 0) {
@@ -78,20 +89,26 @@ void loop() {
   else if(R == 1){
     lcd.print("Y ");
   }
-  lcd.print("TP:");
-  overAll = 100*((oBtrials-oBerror+iBtrials-iBerror)/(oBtrials+iBtrials));
+  lcd.print("T:");
+  overAll = (oBtrials+iBtrials);
   lcd.print(overAll);
   lcd.setCursor(0,1);
+  lcd.print("t:");
+  lcd.print((time - timeArm)/1000);
+  if ((time - timeArm)/1000>=20){
+    lcd.setBacklight(RED);
+  }
+  else{
+      lcd.setBacklight(OFF);
+  }
+  lcd.setCursor(5,1);
   lcd.print("OB:");
   float oBperc = 100*(oBtrials-oBerror)/(oBtrials);
   lcd.print(oBperc);
-  lcd.setCursor(9,1);
+  lcd.setCursor(11,1);
   lcd.print("IB:");
   float iBperc = 100*(iBtrials-iBerror)/(iBtrials);
   lcd.print(iBperc);
-  
-  
-  
   task();
 }
 
@@ -109,11 +126,15 @@ void task() {
       oBtrials++;
       digitalWrite(leftTTL,HIGH);
       digitalWrite(reward,HIGH);
+      digitalWrite(waterL,HIGH);
       delay(1000);
       digitalWrite(reward,LOW);
       digitalWrite(leftTTL,LOW);
+      delay(500);
+      digitalWrite(waterL,LOW);
       previousOB = 0;
       previous = 0;
+      timeArm = millis();
     }
     else  if (SLstate == LOW && (previous == 1 && previousOB == 0)){
       R = 0;
@@ -125,6 +146,7 @@ void task() {
       digitalWrite(leftTTL,LOW);
       previousOB = 0;
       previous = 0;
+      timeArm = millis();
     }
     else if (SLstate == LOW && (previous == 2)){ //inbound error
       R = 0;
@@ -136,6 +158,7 @@ void task() {
       digitalWrite(leftTTL,LOW);
       previousOB = 0;
       previous = 0;
+      timeArm = millis();
     }
     
     //visiting the middle arm
@@ -151,9 +174,13 @@ void task() {
       iBtrials++;
       digitalWrite(midTTL,HIGH);
       digitalWrite(reward,HIGH);
+      digitalWrite(waterM,HIGH);
       delay(1000);
       digitalWrite(reward,LOW);
       digitalWrite(midTTL,LOW);
+      delay(500);
+      digitalWrite(waterM,LOW);
+      timeArm = millis();
       
       previous = 1;
     }
@@ -166,9 +193,13 @@ void task() {
       oBtrials++;
       digitalWrite(rightTTL,HIGH);
       digitalWrite(reward,HIGH);
+      digitalWrite(waterR,HIGH);
       delay(1000);
       digitalWrite(reward,LOW);
       digitalWrite(rightTTL,LOW);
+      delay(500);
+      digitalWrite(waterR,LOW);
+      timeArm = millis();
       previousOB = 2;
       previous = 2;      
     }
@@ -182,6 +213,7 @@ void task() {
       digitalWrite(rightTTL,LOW);
       previousOB = 2;
       previous = 2;
+      timeArm = millis();
     }
     else if (SRstate == LOW && (previous == 0)){ // inbound error
       R = 0;
@@ -193,7 +225,6 @@ void task() {
       digitalWrite(rightTTL,LOW);
       previousOB = 2;
       previous = 2;
+      timeArm = millis();
     }
 }
-
-
